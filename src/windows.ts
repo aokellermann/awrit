@@ -32,6 +32,7 @@ export type Actions = {
   back: () => void;
   forward: () => void;
   refresh: () => void;
+  repaint: () => void;
 };
 
 export type WindowView = {
@@ -217,6 +218,20 @@ export async function createWindowWithToolbar(
   toolbar.webContents.on('cursor-changed', updateCursor);
   content.webContents.on('cursor-changed', updateCursor);
 
+  function repaint() {
+    for (const destructor of destructors) {
+      destructor();
+    }
+    destructors.length = 0;
+
+    const currentSize = getWindowSize();
+    registerPaints(padSize(currentSize));
+
+    // Force Electron to emit new paint events
+    toolbar.webContents.invalidate();
+    content.webContents.invalidate();
+  }
+
   const view: WindowView = {
     toolbar,
     content,
@@ -233,6 +248,7 @@ export async function createWindowWithToolbar(
     refresh: () => {
       content.webContents.reload();
     },
+    repaint,
   };
 
   // Add to managed windows

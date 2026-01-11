@@ -3,6 +3,10 @@ import type { WebContents } from 'electron';
 import { handleEvent as handleKeyBinding } from './keybindings';
 import { focusedView } from './windows';
 
+// Focus repaint delay - wait for graphics state to stabilize after tab switch
+const FOCUS_REPAINT_DELAY_MS = 50;
+let focusRepaintTimeout: ReturnType<typeof setTimeout> | null = null;
+
 // Scroll amount per wheel tick
 const WHEEL_DELTA = 80;
 
@@ -144,6 +148,28 @@ export function handleInput(evt: TermEvent) {
   }
 
   switch (evt.eventType) {
+    case 'focus': {
+      // When terminal tab regains focus, re-initialize graphics
+      // (Kitty invalidates graphics state when switching tabs)
+      // Use a small delay to let graphics state stabilize and debounce rapid events
+      if (evt.focusGained) {
+        if (focusRepaintTimeout) {
+          clearTimeout(focusRepaintTimeout);
+        }
+        focusRepaintTimeout = setTimeout(() => {
+          focusRepaintTimeout = null;
+          view.repaint();
+        }, FOCUS_REPAINT_DELAY_MS);
+      } else if (evt.focusLost) {
+        // Cancel pending repaint if we lose focus again
+        if (focusRepaintTimeout) {
+          clearTimeout(focusRepaintTimeout);
+          focusRepaintTimeout = null;
+        }
+      }
+      break;
+    }
+
     case 'key': {
       // First check if this is a keybinding
       if (handleKeyBinding(evt, view)) {

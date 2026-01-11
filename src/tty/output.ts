@@ -74,7 +74,7 @@ export const setup = () => {
       Mode.cursorKeyToApp,
       Mode.reverseVideo,
       Mode.bracketedPaste,
-      Mode.focusTracking,
+      // Note: focusTracking is enabled by Rust via EnableFocusChange
       Mode.mouseButtonTracking,
       Mode.mouseMotionTracking,
       Mode.mouseMoveTracking,

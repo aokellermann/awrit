@@ -75,7 +75,7 @@ export function registerPaintedContent(
       return;
     }
 
-    if (result.size != null && imageBufferSize > result.size) {
+    if (result.size != null && imageBufferSize !== result.size) {
       if (options['debug-paint']) {
         console_.error('replace buffer', result.buffer.nameBase64, result.size, imageBufferSize);
       }
@@ -168,7 +168,7 @@ export function registerPaintedContentFallback(
     };
 
     let replace = true;
-    if (result.buffer == null || (result.size != null && imageBufferSize > result.size)) {
+    if (result.buffer == null || (result.size != null && imageBufferSize !== result.size)) {
       replace = false;
       const buffer = new ShmGraphicBuffer(imageBufferSize);
       paintedImage?.free();
