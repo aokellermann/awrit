@@ -49,7 +49,7 @@ const homepage = 'https://github.com/chase/awrit';
  * }}
  */
 const keybindings = {
-  '<C-c>': () => {
+  '<C-q>': () => {
     process.emit('SIGINT');
   },
   '<Mouse4>': back,
@@ -58,6 +58,8 @@ const keybindings = {
     '<M-a>': ({ view }) => {
       view.focusedContent.selectAll();
     },
+    '<M-c>': copy,
+    '<M-v>': paste,
     '<M-]>': forward,
     '<M-[>': back,
     '<M-f>': find,
@@ -65,6 +67,8 @@ const keybindings = {
     '<M-l>': focusUrl,
   },
   linux: {
+    '<C-c>': copy,
+    '<C-v>': paste,
     '<C-]>': forward,
     '<C-[>': back,
     '<C-f>': find,
@@ -100,6 +104,14 @@ function focusUrl({ view }) {
   view.content.blurWebView();
   view.toolbar.focusOnWebView();
   view.focusedContent = view.toolbar.webContents;
+}
+
+function copy({ view }) {
+  view.focusedContent.copy();
+}
+
+function paste({ view }) {
+  view.focusedContent.paste();
 }
 
 const config = {
