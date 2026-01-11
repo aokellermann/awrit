@@ -12,6 +12,9 @@ import {
   paintImage,
 } from './tty/kittyGraphics';
 
+// Minimum time between frames (ms) - ~30fps to reduce terminal load
+const MIN_FRAME_TIME_MS = 33;
+
 type PaintedContent = {
   frame?: AnimationFrame;
   buffer?: ShmGraphicBuffer;
@@ -45,6 +48,11 @@ export function registerPaintedContent(
     abort();
   }
 
+  // Frame throttling state
+  let lastPaintTime = 0;
+  let pendingFrame: { bitmap: Buffer; imageSize: { width: number; height: number } } | null = null;
+  let frameScheduled = false;
+
   const result: PaintedContent = {
     destroy() {
       contents.off('paint', paint);
@@ -54,15 +62,14 @@ export function registerPaintedContent(
     },
   };
 
-  async function paint(_: any, _dirty: Rectangle, image: NativeImage) {
-    const imageSize = image.getSize();
-
+  function renderFrame(bitmap: Buffer, imageSize: { width: number; height: number }) {
     const imageBufferSize = imageSize.width * imageSize.height * 4;
     if (result.buffer == null) {
       result.buffer = new ShmGraphicBuffer(imageBufferSize);
+      result.size = imageBufferSize;
     }
     if (options['debug-paint']) {
-      console_.error('paint', result.buffer.nameBase64, image.getSize());
+      console_.error('paint', result.buffer.nameBase64, imageSize);
     }
     if (options['no-paint']) {
       return;
@@ -76,11 +83,43 @@ export function registerPaintedContent(
       result.size = imageBufferSize;
     }
 
-    const buffer = image.toBitmap();
-    result.buffer.write(buffer, imageSize.width);
+    result.buffer.write(bitmap, imageSize.width);
     containerFrame
       .loadFrame(frameNumber, result.buffer, imageSize)
       .composite(layoutNode.deviceLayout);
+
+    lastPaintTime = performance.now();
+  }
+
+  function paint(_: any, _dirty: Rectangle, image: NativeImage) {
+    // Capture bitmap immediately - NativeImage becomes invalid after handler returns
+    const bitmap = image.toBitmap();
+    const imageSize = image.getSize();
+
+    const now = performance.now();
+    const timeSinceLastPaint = now - lastPaintTime;
+
+    // If enough time has passed, render immediately
+    if (timeSinceLastPaint >= MIN_FRAME_TIME_MS) {
+      renderFrame(bitmap, imageSize);
+      pendingFrame = null;
+      return;
+    }
+
+    // Otherwise, store this frame and schedule a deferred render
+    pendingFrame = { bitmap, imageSize };
+
+    if (!frameScheduled) {
+      frameScheduled = true;
+      const delay = MIN_FRAME_TIME_MS - timeSinceLastPaint;
+      setTimeout(() => {
+        frameScheduled = false;
+        if (pendingFrame) {
+          renderFrame(pendingFrame.bitmap, pendingFrame.imageSize);
+          pendingFrame = null;
+        }
+      }, delay);
+    }
   }
 
   contents.on('paint', paint);
@@ -106,6 +145,11 @@ export function registerPaintedContentFallback(
   const cellToPxY = termSize.height / termSize.rows;
   let paintedImage: PaintedImage | undefined;
 
+  // Frame throttling state
+  let lastPaintTime = 0;
+  let pendingFrame: { bitmap: Buffer; imageSize: { width: number; height: number } } | null = null;
+  let frameScheduled = false;
+
   const result: PaintedContent = {
     destroy() {
       contents.off('paint', paint);
@@ -115,8 +159,7 @@ export function registerPaintedContentFallback(
     },
   };
 
-  async function paint(_: any, _dirty: Rectangle, image: NativeImage) {
-    const imageSize = image.getSize();
+  function renderFrame(bitmap: Buffer, imageSize: { width: number; height: number }) {
     const imageBufferSize = imageSize.width * imageSize.height * 4;
 
     const position = {
@@ -129,23 +172,57 @@ export function registerPaintedContentFallback(
       replace = false;
       const buffer = new ShmGraphicBuffer(imageBufferSize);
       paintedImage?.free();
-      buffer.write(image.toBitmap(), imageSize.width);
+      buffer.write(bitmap, imageSize.width);
       paintedImage = paintImage(buffer, imageSize, position);
 
       result.buffer = buffer;
       result.size = imageBufferSize;
     }
     if (options['debug-paint']) {
-      console_.error('paint', result.buffer.nameBase64, image.getSize());
+      console_.error('paint', result.buffer.nameBase64, imageSize);
     }
     if (options['no-paint']) {
       return;
     }
 
     if (replace && paintedImage) {
-      paintedImage.replace(image.toBitmap());
+      paintedImage.replace(bitmap);
+    }
+
+    lastPaintTime = performance.now();
+  }
+
+  function paint(_: any, _dirty: Rectangle, image: NativeImage) {
+    // Capture bitmap immediately - NativeImage becomes invalid after handler returns
+    const bitmap = image.toBitmap();
+    const imageSize = image.getSize();
+
+    const now = performance.now();
+    const timeSinceLastPaint = now - lastPaintTime;
+
+    // If enough time has passed, render immediately
+    if (timeSinceLastPaint >= MIN_FRAME_TIME_MS) {
+      renderFrame(bitmap, imageSize);
+      pendingFrame = null;
+      return;
+    }
+
+    // Otherwise, store this frame and schedule a deferred render
+    pendingFrame = { bitmap, imageSize };
+
+    if (!frameScheduled) {
+      frameScheduled = true;
+      const delay = MIN_FRAME_TIME_MS - timeSinceLastPaint;
+      setTimeout(() => {
+        frameScheduled = false;
+        if (pendingFrame) {
+          renderFrame(pendingFrame.bitmap, pendingFrame.imageSize);
+          pendingFrame = null;
+        }
+      }, delay);
     }
   }
+
   contents.on('paint', paint);
 
   weakPaintedContents_.set(w, result);

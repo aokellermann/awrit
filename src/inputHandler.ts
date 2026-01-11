@@ -5,6 +5,31 @@ import { focusedView } from './windows';
 
 const WHEEL_DELTA = 100;
 
+// Scroll throttling configuration
+const SCROLL_THROTTLE_MS = 16; // ~60fps
+
+// Scroll accumulator state
+interface ScrollState {
+  deltaY: number;
+  x: number;
+  y: number;
+  modifiers: KeyEventModifiers;
+  target: WebContents | null;
+  scheduled: boolean;
+}
+
+// this is a fix for Electron going back and forth on what's supported for modifiers, despite being case insensitive;
+type KeyEventModifiers = Lowercase<KeyEventOriginal['modifiers'][number]>[];
+
+const scrollState: ScrollState = {
+  deltaY: 0,
+  x: 0,
+  y: 0,
+  modifiers: [],
+  target: null,
+  scheduled: false,
+};
+
 // Multi-click detection configuration
 const MULTI_CLICK_TIME_MS = 500; // Max time between clicks for multi-click
 const MULTI_CLICK_DISTANCE_PX = 4; // Max distance between clicks for multi-click
@@ -65,9 +90,31 @@ function getClickCount(
   return clickCount;
 }
 
+function flushScroll() {
+  if (scrollState.deltaY === 0 || !scrollState.target) {
+    scrollState.scheduled = false;
+    return;
+  }
+
+  scrollState.target.sendInputEvent({
+    type: 'mouseWheel',
+    wheelTicksY: 0,
+    wheelTicksX: 0,
+    deltaX: 0,
+    deltaY: scrollState.deltaY,
+    modifiers: scrollState.modifiers,
+    x: scrollState.x,
+    y: scrollState.y,
+    hasPreciseScrollingDeltas: true,
+    canScroll: true,
+  });
+
+  // Reset accumulator
+  scrollState.deltaY = 0;
+  scrollState.scheduled = false;
+}
+
 const mouseEventTypes = ['mouseDown', 'mouseUp', 'mouseMove'] as const;
-// this is a fix for Electron going back and forth on what's supported for modifiers, despite being case insensitive;
-type KeyEventModifiers = Lowercase<KeyEventOriginal['modifiers'][number]>[];
 type KeyEvent = Omit<KeyEventOriginal, 'modifiers'> & {
   modifiers: KeyEventModifiers;
 };
@@ -142,19 +189,19 @@ export function handleInput(evt: TermEvent) {
       const focusedContent = isInToolbar ? view.toolbar.webContents : view.content.webContents;
 
       if (kind === 'scrollUp' || kind === 'scrollDown') {
-        view.content.webContents.sendInputEvent({
-          type: 'mouseWheel',
-          wheelTicksY: kind === 'scrollUp' ? 1 : -1,
-          wheelTicksX: 0,
-          deltaX: 0,
-          deltaY: kind === 'scrollUp' ? WHEEL_DELTA : -WHEEL_DELTA,
-          modifiers,
-          x: adjustedX,
-          y: adjustedY,
-          accelerationRatioY: 0.5,
-          hasPreciseScrollingDeltas: false,
-          canScroll: true,
-        });
+        // Accumulate scroll delta
+        const delta = kind === 'scrollUp' ? WHEEL_DELTA : -WHEEL_DELTA;
+        scrollState.deltaY += delta;
+        scrollState.x = adjustedX;
+        scrollState.y = adjustedY;
+        scrollState.modifiers = modifiers;
+        scrollState.target = view.content.webContents;
+
+        // Schedule flush if not already scheduled
+        if (!scrollState.scheduled) {
+          scrollState.scheduled = true;
+          setTimeout(flushScroll, SCROLL_THROTTLE_MS);
+        }
         break;
       }
 
