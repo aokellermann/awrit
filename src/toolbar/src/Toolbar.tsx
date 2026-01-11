@@ -97,11 +97,22 @@ export function Toolbar() {
 
   const handleUrlSubmit = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
-      let targetUrl = (e.currentTarget as HTMLInputElement).value.trim();
+      const input = (e.currentTarget as HTMLInputElement).value.trim();
+      let targetUrl: string;
 
-      // Add https:// if no protocol is specified
-      if (!/^https?:\/\//i.test(targetUrl)) {
-        targetUrl = 'https://' + targetUrl;
+      // Check if input looks like a URL:
+      // - Has a protocol (http:// or https://)
+      // - Or looks like a domain (contains a dot, no spaces, and starts with valid chars)
+      const hasProtocol = /^https?:\/\//i.test(input);
+      const looksLikeUrl = !input.includes(' ') && /^[a-zA-Z0-9].*\.[a-zA-Z]/.test(input);
+
+      if (hasProtocol) {
+        targetUrl = input;
+      } else if (looksLikeUrl) {
+        targetUrl = 'https://' + input;
+      } else {
+        // Treat as a search query
+        targetUrl = `https://www.google.com/search?q=${encodeURIComponent(input)}`;
       }
 
       window.ipc.navigateTo(targetUrl);
