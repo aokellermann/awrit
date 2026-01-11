@@ -3,10 +3,11 @@ import type { WebContents } from 'electron';
 import { handleEvent as handleKeyBinding } from './keybindings';
 import { focusedView } from './windows';
 
-const WHEEL_DELTA = 100;
+// Scroll amount per wheel tick
+const WHEEL_DELTA = 80;
 
-// Scroll throttling configuration
-const SCROLL_THROTTLE_MS = 16; // ~60fps
+// Scroll throttling - send events at 60fps
+const SCROLL_THROTTLE_MS = 16;
 
 // Swipe gesture configuration
 const SWIPE_THRESHOLD = 300; // Accumulated delta to trigger navigation
@@ -70,12 +71,7 @@ let lastClick: ClickState = {
   target: null,
 };
 
-function getClickCount(
-  x: number,
-  y: number,
-  button: string,
-  target: WebContents,
-): number {
+function getClickCount(x: number, y: number, button: string, target: WebContents): number {
   const now = Date.now();
   const timeDelta = now - lastClick.time;
   const distance = Math.sqrt((x - lastClick.x) ** 2 + (y - lastClick.y) ** 2);

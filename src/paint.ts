@@ -12,8 +12,8 @@ import {
   paintImage,
 } from './tty/kittyGraphics';
 
-// Minimum time between frames (ms) - ~30fps to reduce terminal load
-const MIN_FRAME_TIME_MS = 33;
+// Minimum time between frames (ms) - ~60fps for smooth scrolling
+const MIN_FRAME_TIME_MS = 16;
 
 type PaintedContent = {
   frame?: AnimationFrame;
