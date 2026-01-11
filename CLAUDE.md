@@ -94,3 +94,47 @@ awrit [url]
   --debug-paint/-p   Log graphics protocol output
   --rebuild/-r       Force rebuild toolbar
 ```
+
+## Development Gotchas
+
+- **Console logging disabled**: The main process disables all console methods to prevent stdout interference. Use `console_` export from `src/console.ts` (writes to stderr).
+- **Clipboard tools required**: Paste requires `wl-paste` (Wayland) or `xclip` (X11) installed.
+- **Two-phase build**: Main TypeScript built with bun, toolbar built separately with Vite. Dev mode runs Vite at localhost:5173.
+- **Terminal requirements**: Aborts if Kitty extended keyboard or graphics protocol support is missing.
+
+## State Management Patterns
+
+- **Module-level state**: Critical state lives at module scope (keybinding sequences, scroll state, focus tracking, `exiting` flag).
+- **WeakMap for windows**: `windowViews`, `weakPaintedContents_` use WeakMap to avoid memory leaks.
+- **Destructor arrays**: Paint registration accumulates cleanup functions called on window destruction.
+
+## Platform Handling
+
+- **macOS**: Uses Meta (Cmd) for shortcuts
+- **Linux**: Uses Ctrl for shortcuts
+- **Wayland detection**: Checks `WAYLAND_DISPLAY` or `XDG_SESSION_TYPE` env vars
+- **DPI scale**: Reads `~/.config/monitors.xml` for Kitty on Wayland, falls back to Electron's display API
+
+## Anti-Fingerprinting
+
+Injects anti-fingerprinting script to reduce CAPTCHA prompts:
+- Spoofs webdriver, chrome API, plugins, hardware info, WebGL vendor/renderer
+- Cleans User-Agent (removes Electron/HeadlessChrome markers)
+- See `src/antiFingerprint.ts`
+
+## Extensions
+
+- Uses `electron-chrome-extensions` (GPL-3.0 licensed)
+- uBlock Origin Lite pre-installed
+- Extension installation via `electron-chrome-web-store`
+
+## Testing
+
+```bash
+bun test                        # Run all tests
+bun test src/layout.test.ts     # Run specific file
+```
+
+- Uses `bun:test` with `describe`, `test`, `expect`, `beforeEach`, `afterAll`
+- Fake timers via `@sinonjs/fake-timers` wrapper in `src/fakeTimers.ts`
+- Test files use `.test.ts` suffix
