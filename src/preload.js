@@ -20,4 +20,5 @@ contextBridge.exposeInMainWorld('ipc', {
   onNavigationStateChanged: (callback) =>
     ipcRenderer.on('content:navigation-state-changed', (_event, state) => callback(state)),
   onToggleFind: (callback) => ipcRenderer.on('toolbar:toggle-find', callback),
+  onFocusUrl: (callback) => ipcRenderer.on('toolbar:focus-url', callback),
 });

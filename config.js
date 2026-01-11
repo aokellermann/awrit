@@ -62,12 +62,14 @@ const keybindings = {
     '<M-[>': back,
     '<M-f>': find,
     '<M-r>': refresh,
+    '<M-l>': focusUrl,
   },
   linux: {
     '<C-]>': forward,
     '<C-[>': back,
     '<C-f>': find,
     '<C-r>': refresh,
+    '<C-l>': focusUrl,
   },
 };
 
@@ -88,6 +90,13 @@ function refresh({ view }) {
 
 function find({ view }) {
   view.toolbar.webContents.send('toolbar:toggle-find');
+  view.content.blurWebView();
+  view.toolbar.focusOnWebView();
+  view.focusedContent = view.toolbar.webContents;
+}
+
+function focusUrl({ view }) {
+  view.toolbar.webContents.send('toolbar:focus-url');
   view.content.blurWebView();
   view.toolbar.focusOnWebView();
   view.focusedContent = view.toolbar.webContents;

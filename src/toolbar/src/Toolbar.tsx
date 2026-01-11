@@ -17,6 +17,7 @@ export interface BrowserToolbar {
   findInPage: (text: string, options: { forward: boolean; matchCase: boolean }) => void;
   stopFindInPage: () => void;
   onToggleFind: (callback: () => void) => void;
+  onFocusUrl: (callback: () => void) => void;
 }
 
 declare global {
@@ -73,6 +74,18 @@ export function Toolbar() {
       setIsFindMode(false);
       window.ipc.stopFindInPage();
     }
+  });
+  window.ipc.onFocusUrl(() => {
+    // Exit find mode if active
+    if (isFindMode()) {
+      setIsFindMode(false);
+      window.ipc.stopFindInPage();
+    }
+    // Focus and select URL input on next tick
+    setTimeout(() => {
+      inputRef?.focus();
+      inputRef?.select();
+    }, 0);
   });
 
   document.addEventListener('keydown', (e) => {
