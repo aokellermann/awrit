@@ -1,8 +1,69 @@
 import type { KeyEvent as KeyEventOriginal, TermEvent } from 'awrit-native-rs';
+import type { WebContents } from 'electron';
 import { handleEvent as handleKeyBinding } from './keybindings';
 import { focusedView } from './windows';
 
 const WHEEL_DELTA = 100;
+
+// Multi-click detection configuration
+const MULTI_CLICK_TIME_MS = 500; // Max time between clicks for multi-click
+const MULTI_CLICK_DISTANCE_PX = 4; // Max distance between clicks for multi-click
+
+// State for tracking multi-click sequences
+interface ClickState {
+  x: number;
+  y: number;
+  time: number;
+  count: number;
+  button: string;
+  target: WebContents | null;
+}
+
+let lastClick: ClickState = {
+  x: 0,
+  y: 0,
+  time: 0,
+  count: 0,
+  button: '',
+  target: null,
+};
+
+function getClickCount(
+  x: number,
+  y: number,
+  button: string,
+  target: WebContents,
+): number {
+  const now = Date.now();
+  const timeDelta = now - lastClick.time;
+  const distance = Math.sqrt((x - lastClick.x) ** 2 + (y - lastClick.y) ** 2);
+
+  let clickCount: number;
+  if (
+    timeDelta < MULTI_CLICK_TIME_MS &&
+    distance < MULTI_CLICK_DISTANCE_PX &&
+    button === lastClick.button &&
+    target === lastClick.target
+  ) {
+    // Continuation of multi-click sequence
+    clickCount = lastClick.count + 1;
+  } else {
+    // Start new click sequence
+    clickCount = 1;
+  }
+
+  // Update state
+  lastClick = {
+    x,
+    y,
+    time: now,
+    count: clickCount,
+    button,
+    target,
+  };
+
+  return clickCount;
+}
 
 const mouseEventTypes = ['mouseDown', 'mouseUp', 'mouseMove'] as const;
 // this is a fix for Electron going back and forth on what's supported for modifiers, despite being case insensitive;
@@ -107,13 +168,18 @@ export function handleInput(evt: TermEvent) {
       const electronButton =
         button === 'fourth' || button === 'fifth' || button == null ? undefined : button;
 
+      const clickCount =
+        kind === 'mouseDown' && electronButton
+          ? getClickCount(adjustedX, adjustedY, electronButton, focusedContent)
+          : 0;
+
       focusedContent.sendInputEvent({
         type: kind,
         x: adjustedX,
         y: adjustedY,
         button: electronButton,
         modifiers,
-        clickCount: kind === 'mouseDown' ? 1 : 0,
+        clickCount,
       });
 
       if (kind === 'mouseDown' && button === 'left') {
