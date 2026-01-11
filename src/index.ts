@@ -1,4 +1,4 @@
-import { app, dialog, ipcMain } from 'electron';
+import { app, dialog, ipcMain, BrowserWindow } from 'electron';
 import {
   termEnableFeatures,
   listenForInput,
@@ -65,9 +65,9 @@ const INITIAL_URL = options.url || homepage;
 
 let exiting = false;
 let quitListening = () => {};
+let exitCode = 0;
 
-const cleanup = (signum = 1, reason?: string) => {
-  exiting = true;
+const terminalCleanup = (reason?: string) => {
   quitListening();
   clearPlacements();
   out.cleanup();
@@ -77,8 +77,36 @@ const cleanup = (signum = 1, reason?: string) => {
   if (reason) {
     console_.log(reason);
   }
-  process.exit(signum);
 };
+
+const cleanup = (signum = 0, reason?: string) => {
+  if (exiting) return;
+  exiting = true;
+  exitCode = signum;
+
+  // Close all BrowserWindows first
+  for (const win of BrowserWindow.getAllWindows()) {
+    win.destroy();
+  }
+
+  // Do terminal cleanup
+  terminalCleanup(reason);
+
+  // Quit the Electron app properly
+  app.quit();
+};
+
+// Handle Electron's will-quit event to ensure process exits
+app.on('will-quit', () => {
+  // Ensure terminal is cleaned up if not already
+  if (!exiting) {
+    terminalCleanup();
+  }
+  // Force exit after a short delay if app doesn't quit cleanly
+  setTimeout(() => {
+    process.exit(exitCode);
+  }, 100);
+});
 
 function inputHandler(evt: TermEvent) {
   if (
