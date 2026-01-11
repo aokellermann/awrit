@@ -141,7 +141,7 @@ function setup() {
     cleanup(1, 'Basic Kitty graphics protocol support is required');
   }
 
-  quitListening = listenForInput(inputHandler, 200);
+  quitListening = listenForInput(inputHandler, 16);
 
   out.clearScreen();
   out.placeCursor({ x: 0, y: 0 });

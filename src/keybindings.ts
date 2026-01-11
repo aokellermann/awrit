@@ -12,7 +12,7 @@ type KeyBinding = {
 
 type KeyBindingMap = Map<string, KeyBinding[]>;
 
-const TIMEOUT_MS = 500; // Increased timeout for better UX
+const TIMEOUT_MS = 100; // Short timeout for responsive multi-key sequences
 
 // State
 const bindings: KeyBindingMap = new Map();
