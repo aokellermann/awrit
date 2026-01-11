@@ -7,7 +7,7 @@ import {
 } from 'electron';
 import path from 'node:path';
 import { registerPaintedContent, registerPaintedContentFallback } from './paint';
-import { sessionPromise } from './session';
+import { sessionPromise, ANTI_FINGERPRINT_SCRIPT } from './session';
 import { extensionsPromise, installedExtensionsPromise } from './extensions';
 import { paintInitialFrame } from './tty/kittyGraphics';
 import { getWindowSize, ShmGraphicBuffer } from 'awrit-native-rs';
@@ -150,8 +150,17 @@ export async function createWindowWithToolbar(
       offscreen: true,
       nodeIntegration: false,
       contextIsolation: true,
-      disableDialogs: true,
     },
+  });
+
+  // Inject anti-fingerprinting script as early as possible
+  // Use did-start-navigation for earliest injection point
+  content.webContents.on('did-start-navigation', () => {
+    content.webContents.executeJavaScript(ANTI_FINGERPRINT_SCRIPT).catch(() => {});
+  });
+  // Also inject on dom-ready as a fallback
+  content.webContents.on('dom-ready', () => {
+    content.webContents.executeJavaScript(ANTI_FINGERPRINT_SCRIPT).catch(() => {});
   });
 
   const destructors: Array<() => void> = [];
