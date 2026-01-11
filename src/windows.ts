@@ -270,6 +270,10 @@ export async function createWindowWithToolbar(
       console_.error('resize', size);
       updateViewSizes(view, size);
       registerPaints(padSize(size));
+
+      // Force Electron to emit new paint events
+      toolbar.webContents.invalidate();
+      content.webContents.invalidate();
     }),
   );
 
