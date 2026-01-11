@@ -112,7 +112,8 @@ function inputHandler(evt: TermEvent) {
   if (
     evt.eventType === 'key' &&
     evt.keyEvent.code === 'd' &&
-    evt.keyEvent.modifiers.includes('ctrl')
+    evt.keyEvent.modifiers.includes('ctrl') &&
+    evt.keyEvent.down
   ) {
     cleanup(0);
   }
