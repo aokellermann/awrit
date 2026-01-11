@@ -8,6 +8,10 @@ const WHEEL_DELTA = 100;
 // Scroll throttling configuration
 const SCROLL_THROTTLE_MS = 16; // ~60fps
 
+// Swipe gesture configuration
+const SWIPE_THRESHOLD = 300; // Accumulated delta to trigger navigation
+const SWIPE_TIMEOUT_MS = 500; // Reset swipe state after inactivity
+
 // Scroll accumulator state
 interface ScrollState {
   deltaY: number;
@@ -16,6 +20,13 @@ interface ScrollState {
   modifiers: KeyEventModifiers;
   target: WebContents | null;
   scheduled: boolean;
+}
+
+// Swipe gesture state for back/forward navigation
+interface SwipeState {
+  deltaX: number;
+  lastEventTime: number;
+  triggered: boolean;
 }
 
 // this is a fix for Electron going back and forth on what's supported for modifiers, despite being case insensitive;
@@ -28,6 +39,12 @@ const scrollState: ScrollState = {
   modifiers: [],
   target: null,
   scheduled: false,
+};
+
+const swipeState: SwipeState = {
+  deltaX: 0,
+  lastEventTime: 0,
+  triggered: false,
 };
 
 // Multi-click detection configuration
@@ -201,6 +218,37 @@ export function handleInput(evt: TermEvent) {
         if (!scrollState.scheduled) {
           scrollState.scheduled = true;
           setTimeout(flushScroll, SCROLL_THROTTLE_MS);
+        }
+        break;
+      }
+
+      if (kind === 'scrollLeft' || kind === 'scrollRight') {
+        const now = Date.now();
+
+        // Reset swipe state if too much time has passed
+        if (now - swipeState.lastEventTime > SWIPE_TIMEOUT_MS) {
+          swipeState.deltaX = 0;
+          swipeState.triggered = false;
+        }
+
+        // Accumulate horizontal delta (left is positive for back, right is negative for forward)
+        const delta = kind === 'scrollLeft' ? WHEEL_DELTA : -WHEEL_DELTA;
+        swipeState.deltaX += delta;
+        swipeState.lastEventTime = now;
+
+        // Check if threshold is crossed and navigation hasn't been triggered yet
+        if (!swipeState.triggered) {
+          if (swipeState.deltaX >= SWIPE_THRESHOLD) {
+            // Swipe left -> go back
+            view.back();
+            swipeState.triggered = true;
+            swipeState.deltaX = 0;
+          } else if (swipeState.deltaX <= -SWIPE_THRESHOLD) {
+            // Swipe right -> go forward
+            view.forward();
+            swipeState.triggered = true;
+            swipeState.deltaX = 0;
+          }
         }
         break;
       }
