@@ -106,12 +106,37 @@ function focusUrl({ view }) {
   view.focusedContent = view.toolbar.webContents;
 }
 
+const { execSync } = require('node:child_process');
+
+// OSC 52 escape sequence for clipboard copy (works in Kitty and other modern terminals)
+function osc52Copy(text) {
+  const encoded = Buffer.from(text).toString('base64');
+  // OSC 52 ; c ; <base64-data> ST
+  process.stdout.write(`\x1b]52;c;${encoded}\x1b\\`);
+}
+
 function copy({ view }) {
-  view.focusedContent.copy();
+  if (!view?.focusedContent) return;
+  view.focusedContent.executeJavaScript('window.getSelection().toString()').then((text) => {
+    if (text) {
+      osc52Copy(text);
+    }
+  }).catch((err) => debug('copy error:', err));
 }
 
 function paste({ view }) {
-  view.focusedContent.paste();
+  if (!view?.focusedContent) return;
+  try {
+    // Use wl-paste on Wayland, fallback to xclip on X11
+    const text = process.env.WAYLAND_DISPLAY
+      ? execSync('wl-paste -n 2>/dev/null', { encoding: 'utf8' })
+      : execSync('xclip -selection clipboard -o 2>/dev/null', { encoding: 'utf8' });
+    if (text) {
+      view.focusedContent.insertText(text);
+    }
+  } catch {
+    // Clipboard empty or tool not available
+  }
 }
 
 const config = {
