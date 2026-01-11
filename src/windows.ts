@@ -314,6 +314,11 @@ function setupToolbarIPC(
   contentContents.on('did-navigate-in-page', (_event, url, isMainFrame) => {
     if (isMainFrame) {
       toolbarContents.send('content:url-changed', url);
+      const navigationState = {
+        canGoBack: contentContents.navigationHistory.canGoBack(),
+        canGoForward: contentContents.navigationHistory.canGoForward(),
+      };
+      toolbarContents.send('content:navigation-state-changed', navigationState);
     }
   });
 
